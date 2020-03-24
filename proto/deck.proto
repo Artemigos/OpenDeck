@@ -1,0 +1,92 @@
+syntax = "proto3";
+package OpenDeck.Protocol;
+
+import "google/protobuf/empty.proto";
+
+message Meta {
+    uint32 protocol_version = 1;
+    string device_id = 2;
+    string device_type_id = 3;
+    repeated Feature features = 4;
+    Size grid_size = 5;
+
+    message Feature {
+        oneof feature {
+            CustomFeature custom_feature = 1;
+            ButtonDisplayFeature button_display_feature = 2;
+            CustomGridFeature custom_grid_feature = 3;
+            ButtonLabelFeature button_label_feature = 4;
+        }
+    }
+
+    message CustomFeature {
+        string name = 1;
+        bytes additional_data = 2;
+    }
+
+    message ButtonDisplayFeature {
+        Size preferred_resolution = 1;
+    }
+
+    message CustomGridFeature {
+        Size min_size = 1;
+        Size max_size = 2;
+    }
+
+    message ButtonLabelFeature {
+        uint32 max_length = 1;
+    }
+}
+
+message Size {
+    uint32 width = 1;
+    uint32 height = 2;
+}
+
+message Image {
+    Size size = 1;
+    bytes rgb_pixel_data = 2;
+}
+
+message ButtonPos {
+    uint32 x = 1;
+    uint32 y = 2;
+}
+
+message SetButtonImageRequest {
+    ButtonPos button = 1;
+    Image image = 2;
+}
+
+message SetButtonLabelRequest {
+    ButtonPos button = 1;
+    string label = 2;
+}
+
+message Event {
+    oneof event {
+        ButtonDownEvent button_down_event = 1;
+        ButtonUpEvent button_up_event = 2;
+        ButtonClickEvent button_click_event = 3;
+    }
+}
+
+message ButtonDownEvent {
+    ButtonPos button = 1;
+}
+
+message ButtonUpEvent {
+    ButtonPos button = 1;
+}
+
+message ButtonClickEvent {
+    ButtonPos button = 1;
+}
+
+service Device {
+    rpc GetMeta (google.protobuf.Empty) returns (Meta);
+    rpc SetGridSize (Size) returns (google.protobuf.Empty);
+    rpc SetButtonImage (SetButtonImageRequest) returns (google.protobuf.Empty);
+    rpc SetButtonLabel (SetButtonLabelRequest) returns (google.protobuf.Empty);
+    rpc GetEventStream (google.protobuf.Empty) returns (stream Event);
+}

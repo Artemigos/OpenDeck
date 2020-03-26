@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Protocol\Protocol.csproj" />
+    <ProjectReference Include="..\Client.Lib\Client.Lib.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>OpenDeck.Client.Lib</AssemblyName>
+    <RootNamespace>OpenDeck.Client.Lib</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Protocol\Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

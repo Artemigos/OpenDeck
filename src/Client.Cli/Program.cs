@@ -28,49 +28,78 @@ namespace OpenDeck.Client.Cli
                 }
             });
 
-            // run user commands
-            while (true)
+            try
             {
-                Console.Write("> ");
-                var command = Console.ReadLine();
-
-                if (command == "exit")
+                // run user commands
+                while (true)
                 {
-                    break;
-                }
+                    Console.Write("> ");
+                    var command = Console.ReadLine();
 
-                if (command == "flush")
-                {
-                    while (q.TryDequeue(out var ev))
+                    if (command == "exit")
                     {
-                        Console.Write(ev.EventCase);
-                        var pos = ev.ButtonClickEvent?.Button ?? ev.ButtonDownEvent?.Button ?? ev.ButtonUpEvent.Button;
-                        Console.WriteLine($" {pos.X} {pos.Y}");
+                        break;
+                    }
+
+                    if (command == "flush")
+                    {
+                        while (q.TryDequeue(out var ev))
+                        {
+                            Console.Write(ev.EventCase);
+                            var pos = ev.ButtonClickEvent?.Button ?? ev.ButtonDownEvent?.Button ?? ev.ButtonUpEvent.Button;
+                            Console.WriteLine($" {pos.X} {pos.Y}");
+                        }
+                    }
+                    else if (command.StartsWith("label "))
+                    {
+                        var arguments = command.Substring(command.IndexOf(' ') + 1);
+                        var xStr = arguments.Substring(0, arguments.IndexOf(' '));
+                        var x = uint.Parse(xStr);
+                        arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
+                        var yStr = arguments.Substring(0, arguments.IndexOf(' '));
+                        var y = uint.Parse(yStr);
+                        arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
+
+                        await cli.SetButtonLabelAsync(new SetButtonLabelRequest { Button = new ButtonPos { X = x, Y = y }, Label = arguments });
+                    }
+                    else if (command == "info")
+                    {
+                        var meta = await cli.GetMetaAsync(new Google.Protobuf.WellKnownTypes.Empty());
+                        Console.WriteLine(meta.DeviceId);
+                        Console.WriteLine(meta.DeviceTypeId);
+                        Console.WriteLine($"{meta.GridSize.Width}x{meta.GridSize.Height}");
+
+                        foreach (var feature in meta.Features)
+                        {
+                            Console.Write("+ ");
+                            switch (feature.FeatureCase)
+                            {
+                                case Meta.Types.Feature.FeatureOneofCase.ButtonLabelFeature:
+                                    Console.WriteLine($"label:{feature.ButtonLabelFeature.MaxLength}");
+                                    break;
+                                case Meta.Types.Feature.FeatureOneofCase.ButtonDisplayFeature:
+                                    Console.WriteLine($"display:{feature.ButtonDisplayFeature.PreferredResolution.Width}x{feature.ButtonDisplayFeature.PreferredResolution.Height}");
+                                    break;
+                                case Meta.Types.Feature.FeatureOneofCase.CustomGridFeature:
+                                    Console.WriteLine($"custom_grid:{feature.CustomGridFeature.MinSize.Width}x{feature.CustomGridFeature.MinSize.Height}:{feature.CustomGridFeature.MaxSize.Width}x{feature.CustomGridFeature.MaxSize.Height}");
+                                    break;
+                                case Meta.Types.Feature.FeatureOneofCase.CustomFeature:
+                                    Console.WriteLine($"custom:{feature.CustomFeature.Name}");
+                                    break;
+                                default:
+                                    Console.WriteLine("unknown feature");
+                                    break;
+                            }
+                        }
                     }
                 }
-                else if (command.StartsWith("label "))
-                {
-                    var arguments = command.Substring(command.IndexOf(' ') + 1);
-                    var xStr = arguments.Substring(0, arguments.IndexOf(' '));
-                    var x = uint.Parse(xStr);
-                    arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
-                    var yStr = arguments.Substring(0, arguments.IndexOf(' '));
-                    var y = uint.Parse(yStr);
-                    arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
-
-                    await cli.SetButtonLabelAsync(new SetButtonLabelRequest { Button = new ButtonPos { X = x, Y = y }, Label = arguments });
-                }
-                else if (command == "info")
-                {
-                    var meta = await cli.GetMetaAsync(new Google.Protobuf.WellKnownTypes.Empty());
-                    Console.WriteLine(meta.DeviceId);
-                    Console.WriteLine(meta.DeviceTypeId);
-                }
             }
-
-            // cleanup
-            cancel.Cancel();
-            await t;
+            finally
+            {
+                // cleanup
+                cancel.Cancel();
+                await t;
+            }
         }
     }
 }

@@ -16,6 +16,17 @@
             "stopAtEntry": false
         },
         {
+            "name": "GTK client",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build gtk client",
+            "program": "${workspaceFolder}/src/Client.Gtk/bin/Debug/netcoreapp3.0/OpenDeck.Client.Gtk.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Client.Gtk",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
             "name": "GTK device",
             "type": "coreclr",
             "request": "launch",

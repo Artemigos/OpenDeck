@@ -1,0 +1,36 @@
+name: OpenDeck .NET Core build
+on:
+  push:
+    branches:
+      - master
+      - release/*
+  schedule:
+    - cron: "0 0 * * 0-6" 
+  pull_request:
+    branches: [ master ]
+  release:
+    types: 
+      - created
+
+jobs:
+  build:
+    name: Build OpenDeck for .Net Core
+    runs-on: ubuntu-latest
+    
+    steps:
+    
+    - name: Checkout current master branch
+      uses: actions/checkout@v2
+      with: 
+        ref: master
+    
+    - name: Setup .NET Core environment
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.101
+    
+    - name: Build OpenDeck solution
+      run: dotnet build src/OpenDeck.sln --configuration Release --nologo
+    
+#    - name: Run OpenDeck tests
+#      run: dotnet test src/OpenDeck.sln --verbosity normal --no-build --nologo

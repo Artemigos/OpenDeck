@@ -6,7 +6,7 @@ using UI = Gtk.Builder.ObjectAttribute;
 
 namespace OpenDeck.Device.Gtk
 {
-    public class MainWindow : Window, IButtonEventSource, IButtonLabelSetter, IGridSizeProvider, IGridSizeSetter
+    public class MainWindow : Window, IButtonEventSource, IButtonLabelSetter, IGridSizeProvider, IGridSizeSetter, IButtonImageSetter
     {
         private readonly DefaultDeviceService _srv;
         private readonly Server _server;
@@ -33,9 +33,12 @@ namespace OpenDeck.Device.Gtk
         public uint MaxLength => 20;
         public (uint width, uint height) MinGridSize => (1, 1);
         public (uint width, uint height) MaxGridSize => (10, 10);
+        public (uint width, uint height) PreferredResolution => (0, 0);
 
         public void SetButtonLabel(uint x, uint y, string label) =>
             global::Gtk.Application.Invoke((sender, args) => _buttons[(int)x, (int)y].SetLabel(label));
+        public void SetButtonImage(uint x, uint y, byte[] image, uint imageWidth, uint imageHeight) =>
+            global::Gtk.Application.Invoke((sender, args) => _buttons[(int)x, (int)y].SetImage(image, imageWidth, imageHeight));
         public (uint width, uint height) GetGridSize() => _size;
 
         public void SetGridSize(uint width, uint height)
@@ -89,9 +92,9 @@ namespace OpenDeck.Device.Gtk
                     op(x, y, buttons[x, y]);
         }
 
-        private void Window_DeleteEvent(object sender, DeleteEventArgs a)
+        private async void Window_DeleteEvent(object sender, DeleteEventArgs a)
         {
-            _server.ShutdownAsync().Wait();
+            await _server.ShutdownAsync();
             Application.Quit();
         }
 
@@ -102,7 +105,7 @@ namespace OpenDeck.Device.Gtk
 
         private (Server, DefaultDeviceService) StartServer(string id = "tmp-id", string typeId = "Gtk/0.0.1", string host = "127.0.0.1", int port = 8020)
         {
-            var srv = new DefaultDeviceService(id, typeId, this, this, labelSetter: this, gridSizeSetter: this);
+            var srv = new DefaultDeviceService(id, typeId, this, this, this, this, this); // xD
             var server = new Server();
             server.Services.Add(OpenDeck.Protocol.Device.BindService(srv));
             server.Ports.Add(new ServerPort(host, port, ServerCredentials.Insecure));
@@ -142,7 +145,7 @@ namespace OpenDeck.Device.Gtk
             public Button Button { get; }
 
             public void SetLabel(string label) => Button.Label = label;
-            public void SetImage(byte[] image) => throw new NotImplementedException();
+            public void SetImage(byte[] image, uint width, uint height) => Button.Image = GetImage(image, width, height);
 
             public void Dispose()
             {
@@ -155,6 +158,13 @@ namespace OpenDeck.Device.Gtk
             private void HandleDown(object sender, EventArgs e) => _handleDown(X, Y);
             private void HandleUp(object sender, EventArgs e) => _handleUp(X, Y);
             private void HandleClick(object sender, EventArgs e) => _handleClick(X, Y);
+
+            private global::Gtk.Image GetImage(byte[] imageData, uint width, uint height)
+            {
+                var pb = new Gdk.Pixbuf(imageData, Gdk.Colorspace.Rgb, false, 8, (int)width, (int)height, 3 * (int)width);
+                return new global::Gtk.Image(pb);
+                // TODO: the image always appears in full resolution - there might be some work to get it to scale with the button
+            }
         }
     }
 }

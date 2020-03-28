@@ -37,8 +37,12 @@ namespace OpenDeck.Device.Gtk
 
         public void SetButtonLabel(uint x, uint y, string label) =>
             global::Gtk.Application.Invoke((sender, args) => _buttons[(int)x, (int)y].SetLabel(label));
-        public void SetButtonImage(uint x, uint y, byte[] image, uint imageWidth, uint imageHeight) =>
-            global::Gtk.Application.Invoke((sender, args) => _buttons[(int)x, (int)y].SetImage(image, imageWidth, imageHeight));
+        public void SetButtonImage(uint x, uint y, byte[] image, OpenDeck.Protocol.Image.Types.Format format, uint imageWidth, uint imageHeight) =>
+            global::Gtk.Application.Invoke((sender, args) => _buttons[(int)x, (int)y].SetImage(
+                image,
+                format == OpenDeck.Protocol.Image.Types.Format.Rgba32,
+                imageWidth,
+                imageHeight));
         public (uint width, uint height) GetGridSize() => _size;
 
         public void SetGridSize(uint width, uint height)
@@ -145,7 +149,7 @@ namespace OpenDeck.Device.Gtk
             public Button Button { get; }
 
             public void SetLabel(string label) => Button.Label = label;
-            public void SetImage(byte[] image, uint width, uint height) => Button.Image = GetImage(image, width, height);
+            public void SetImage(byte[] image, bool hasAlpha, uint width, uint height) => Button.Image = GetImage(image, hasAlpha, width, height);
 
             public void Dispose()
             {
@@ -159,9 +163,10 @@ namespace OpenDeck.Device.Gtk
             private void HandleUp(object sender, EventArgs e) => _handleUp(X, Y);
             private void HandleClick(object sender, EventArgs e) => _handleClick(X, Y);
 
-            private global::Gtk.Image GetImage(byte[] imageData, uint width, uint height)
+            private global::Gtk.Image GetImage(byte[] imageData, bool hasAlpha, uint width, uint height)
             {
-                var pb = new Gdk.Pixbuf(imageData, Gdk.Colorspace.Rgb, false, 8, (int)width, (int)height, 3 * (int)width);
+                var stride = (hasAlpha ? 4 : 3) * (int)width;
+                var pb = new Gdk.Pixbuf(imageData, Gdk.Colorspace.Rgb, hasAlpha, 8, (int)width, (int)height, stride);
                 return new global::Gtk.Image(pb);
                 // TODO: the image always appears in full resolution - there might be some work to get it to scale with the button
             }

@@ -124,7 +124,8 @@ namespace OpenDeck.Protocol
             _imageSetter.SetButtonImage(
                 request.Button.X,
                 request.Button.Y,
-                request.Image.RgbPixelData.ToByteArray(),
+                request.Image.PixelData.ToByteArray(),
+                request.Image.Format,
                 request.Image.Size.Width,
                 request.Image.Size.Height);
 

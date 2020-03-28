@@ -83,7 +83,7 @@ namespace OpenDeck.Client.Cli
                         var yStr = arguments.Substring(0, arguments.IndexOf(' '));
                         var y = uint.Parse(yStr);
                         arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
-                        var img = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgb24>(arguments);
+                        var img = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(arguments);
                         var data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
 
                         await cli.SetButtonImageAsync(new SetButtonImageRequest
@@ -92,7 +92,8 @@ namespace OpenDeck.Client.Cli
                             Image = new Image
                             {
                                 Size = new Size { Width = (uint)img.Width, Height = (uint)img.Height },
-                                RgbPixelData = Google.Protobuf.ByteString.CopyFrom(data)
+                                PixelData = Google.Protobuf.ByteString.CopyFrom(data),
+                                Format = Image.Types.Format.Rgba32
                             }
                         });
                     }

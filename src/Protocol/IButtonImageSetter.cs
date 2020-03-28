@@ -4,6 +4,6 @@ namespace OpenDeck.Protocol
     {
         (uint width, uint height) PreferredResolution { get; }
 
-        void SetButtonImage(uint x, uint y, byte[] image, uint imageWidth, uint imageHeight);
+        void SetButtonImage(uint x, uint y, byte[] image, Image.Types.Format format, uint imageWidth, uint imageHeight);
     }
 }

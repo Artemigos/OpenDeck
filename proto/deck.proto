@@ -45,7 +45,13 @@ message Size {
 
 message Image {
     Size size = 1;
-    bytes rgb_pixel_data = 2;
+    bytes pixel_data = 2;
+    Format format = 3;
+
+    enum Format {
+        Rgb24 = 0;
+        Rgba32 = 1;
+    }
 }
 
 message ButtonPos {

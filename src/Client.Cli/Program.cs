@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
 using OpenDeck.Protocol;
+using SixLabors.ImageSharp.Advanced;
 
 namespace OpenDeck.Client.Cli
 {
@@ -62,6 +64,39 @@ namespace OpenDeck.Client.Cli
 
                         await cli.SetButtonLabelAsync(new SetButtonLabelRequest { Button = new ButtonPos { X = x, Y = y }, Label = arguments });
                     }
+                    else if (command.StartsWith("size "))
+                    {
+                        var arguments = command.Substring(command.IndexOf(' ') + 1);
+                        var wStr = arguments.Substring(0, arguments.IndexOf(' '));
+                        var w = uint.Parse(wStr);
+                        arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
+                        var h = uint.Parse(arguments);
+
+                        await cli.SetGridSizeAsync(new Size { Width = w, Height = h });
+                    }
+                    else if (command.StartsWith("image "))
+                    {
+                        var arguments = command.Substring(command.IndexOf(' ') + 1);
+                        var xStr = arguments.Substring(0, arguments.IndexOf(' '));
+                        var x = uint.Parse(xStr);
+                        arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
+                        var yStr = arguments.Substring(0, arguments.IndexOf(' '));
+                        var y = uint.Parse(yStr);
+                        arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
+                        var img = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(arguments);
+                        var data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
+
+                        await cli.SetButtonImageAsync(new SetButtonImageRequest
+                        {
+                            Button = new ButtonPos { X = x, Y = y },
+                            Image = new Image
+                            {
+                                Size = new Size { Width = (uint)img.Width, Height = (uint)img.Height },
+                                PixelData = Google.Protobuf.ByteString.CopyFrom(data),
+                                Format = Image.Types.Format.Rgba32
+                            }
+                        });
+                    }
                     else if (command == "info")
                     {
                         var meta = await cli.GetMetaAsync(new Google.Protobuf.WellKnownTypes.Empty());
@@ -91,6 +126,10 @@ namespace OpenDeck.Client.Cli
                                     break;
                             }
                         }
+                    }
+                    else
+                    {
+                        Console.WriteLine("unknown command");
                     }
                 }
             }

@@ -104,6 +104,8 @@ namespace OpenDeck.Protocol
             if (_labelSetter == null)
                 throw new RpcException(new Status(StatusCode.Unimplemented, "The label feature is not supported on this device."));
 
+            CheckButtonPos(request.Button);
+
             var label = request.Label;
             if (label.Length > _labelSetter.MaxLength)
                 label = label.Substring((int)_labelSetter.MaxLength);
@@ -117,10 +119,13 @@ namespace OpenDeck.Protocol
             if (_imageSetter == null)
                 throw new RpcException(new Status(StatusCode.Unimplemented, "The image feature is not supported on this device."));
 
+            CheckButtonPos(request.Button);
+
             _imageSetter.SetButtonImage(
                 request.Button.X,
                 request.Button.Y,
-                request.Image.RgbPixelData.ToByteArray(),
+                request.Image.PixelData.ToByteArray(),
+                request.Image.Format,
                 request.Image.Size.Width,
                 request.Image.Size.Height);
 
@@ -192,6 +197,13 @@ namespace OpenDeck.Protocol
             {
                 coll.Add(ev);
             }
+        }
+
+        private void CheckButtonPos(ButtonPos pos)
+        {
+            var (width, height) = _gridSizeProvider.GetGridSize();
+            if (pos.X >= width || pos.Y >= height)
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Button position out of grid size."));
         }
 
         private Size ToSize((uint width, uint height) size) => new Size { Width = size.width, Height = size.height };

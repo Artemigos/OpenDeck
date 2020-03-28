@@ -62,6 +62,16 @@ namespace OpenDeck.Client.Cli
 
                         await cli.SetButtonLabelAsync(new SetButtonLabelRequest { Button = new ButtonPos { X = x, Y = y }, Label = arguments });
                     }
+                    else if (command.StartsWith("size "))
+                    {
+                        var arguments = command.Substring(command.IndexOf(' ') + 1);
+                        var wStr = arguments.Substring(0, arguments.IndexOf(' '));
+                        var w = uint.Parse(wStr);
+                        arguments = arguments.Substring(arguments.IndexOf(' ') + 1);
+                        var h = uint.Parse(arguments);
+
+                        await cli.SetGridSizeAsync(new Size { Width = w, Height = h });
+                    }
                     else if (command == "info")
                     {
                         var meta = await cli.GetMetaAsync(new Google.Protobuf.WellKnownTypes.Empty());

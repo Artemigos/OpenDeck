@@ -6,56 +6,24 @@ using UI = Gtk.Builder.ObjectAttribute;
 
 namespace OpenDeck.Device.Gtk
 {
-    public class MainWindow : Window, IButtonEventSource, IButtonLabelSetter, IGridSizeProvider
+    public class MainWindow : Window, IButtonEventSource, IButtonLabelSetter, IGridSizeProvider, IGridSizeSetter
     {
-        private readonly Button[,] _buttons;
         private readonly DefaultDeviceService _srv;
         private readonly Server _server;
 
-        [UI] private Button _btn00 = null;
-        [UI] private Button _btn10 = null;
-        [UI] private Button _btn20 = null;
-        [UI] private Button _btn30 = null;
-        [UI] private Button _btn01 = null;
-        [UI] private Button _btn11 = null;
-        [UI] private Button _btn21 = null;
-        [UI] private Button _btn31 = null;
-        [UI] private Button _btn02 = null;
-        [UI] private Button _btn12 = null;
-        [UI] private Button _btn22 = null;
-        [UI] private Button _btn32 = null;
+        [UI] private Grid _grid = null;
+        private ButtonWrapper[,] _buttons;
+        private (uint width, uint height) _size;
 
         public MainWindow() : this(new Builder("MainWindow.glade")) { }
 
         private MainWindow(Builder builder) : base(builder.GetObject("MainWindow").Handle)
         {
             builder.Autoconnect(this);
-
-            _buttons = new Button[4, 3];
-            _buttons[0, 0] = _btn00;
-            _buttons[1, 0] = _btn10;
-            _buttons[2, 0] = _btn20;
-            _buttons[3, 0] = _btn30;
-            _buttons[0, 1] = _btn01;
-            _buttons[1, 1] = _btn11;
-            _buttons[2, 1] = _btn21;
-            _buttons[3, 1] = _btn31;
-            _buttons[0, 2] = _btn02;
-            _buttons[1, 2] = _btn12;
-            _buttons[2, 2] = _btn22;
-            _buttons[3, 2] = _btn32;
-
             DeleteEvent += Window_DeleteEvent;
 
-            ForAllButtons((x, y, btn) => btn.Clicked += CreateButtonClickHandler(x, y));
-            ForAllButtons((x, y, btn) => btn.Pressed += CreateButtonDownHandler(x, y));
-            ForAllButtons((x, y, btn) => btn.Released += CreateButtonUpHandler(x, y));
-
-            _srv = new DefaultDeviceService("tmp-id", "Gtk/0.0.1", this, this, labelSetter: this);
-            _server = new Server();
-            _server.Services.Add(OpenDeck.Protocol.Device.BindService(_srv));
-            _server.Ports.Add(new ServerPort("127.0.0.1", 8020, ServerCredentials.Insecure));
-            _server.Start();
+            SetGridSize(4, 3);
+            (_server, _srv) = StartServer();
         }
 
         public event EventHandler<ButtonEventArgs> ButtonDown;
@@ -63,17 +31,63 @@ namespace OpenDeck.Device.Gtk
         public event EventHandler<ButtonEventArgs> ButtonClick;
 
         public uint MaxLength => 20;
+        public (uint width, uint height) MinGridSize => (1, 1);
+        public (uint width, uint height) MaxGridSize => (10, 10);
 
-        public void ForAllButtons(Action<uint, uint, Button> op)
+        public void SetButtonLabel(uint x, uint y, string label) =>
+            global::Gtk.Application.Invoke((sender, args) => _buttons[(int)x, (int)y].SetLabel(label));
+        public (uint width, uint height) GetGridSize() => _size;
+
+        public void SetGridSize(uint width, uint height)
         {
-            for (uint y = 0; y < _buttons.GetLength(1); ++y)
-                for (uint x = 0; x < _buttons.GetLength(0); ++x)
-                    op(x, y, _buttons[x, y]);
+            global::Gtk.Application.Invoke((sender, args) =>
+            {
+                var oldButtons = _buttons;
+                _buttons = new ButtonWrapper[width, height];
+
+                var oldW = oldButtons?.GetLength(0) ?? 0;
+                var oldH = oldButtons?.GetLength(1) ?? 0;
+
+                // fill new buttons array
+                ForAll(_buttons, (x, y, _) =>
+                {
+                    // new array is bigger - the button needs to be created
+                    if (x >= oldW || y >= oldH)
+                    {
+                        _buttons[x, y] = CreateButton(x, y);
+                        _grid.Attach(_buttons[x, y].Button, (int)x, (int)y, 1, 1);
+                    }
+                    // button already exists in old array - reuse
+                    else
+                    {
+                        _buttons[x, y] = oldButtons[x, y];
+                    }
+                });
+
+                // clean up old buttons
+                if (oldButtons != null)
+                {
+                    ForAll(oldButtons, (x, y, btn) =>
+                    {
+                        // button wasn't reused - clean up
+                        if (x >= width || y >= height)
+                        {
+                            _grid.Remove(btn.Button);
+                            btn.Dispose();
+                        }
+                    });
+                }
+
+                _size = (width, height);
+            });
         }
 
-        public void SetButtonLabel(uint x, uint y, string label) => _buttons[(int)x, (int)y].Label = label;
-
-        public (uint width, uint height) GetGridSize() => (4, 3);
+        private void ForAll(ButtonWrapper[,] buttons, Action<uint, uint, ButtonWrapper> op)
+        {
+            for (uint y = 0; y < buttons.GetLength(1); ++y)
+                for (uint x = 0; x < buttons.GetLength(0); ++x)
+                    op(x, y, buttons[x, y]);
+        }
 
         private void Window_DeleteEvent(object sender, DeleteEventArgs a)
         {
@@ -81,34 +95,66 @@ namespace OpenDeck.Device.Gtk
             Application.Quit();
         }
 
-        private EventHandler CreateButtonDownHandler(uint x, uint y)
-        {
-            return ButtonDownHandler;
+        private void ButtonDownHandler(uint x, uint y) => ButtonDown?.Invoke(this, new ButtonEventArgs(x, y));
+        private void ButtonUpHandler(uint x, uint y) => ButtonUp?.Invoke(this, new ButtonEventArgs(x, y));
+        private void ButtonClickedHandler(uint x, uint y) => ButtonClick?.Invoke(this, new ButtonEventArgs(x, y));
+        private ButtonWrapper CreateButton(uint x, uint y) => new ButtonWrapper(x, y, ButtonDownHandler, ButtonUpHandler, ButtonClickedHandler);
 
-            void ButtonDownHandler(object sender, EventArgs a)
-            {
-                ButtonDown?.Invoke(this, new ButtonEventArgs(x, y));
-            }
+        private (Server, DefaultDeviceService) StartServer(string id = "tmp-id", string typeId = "Gtk/0.0.1", string host = "127.0.0.1", int port = 8020)
+        {
+            var srv = new DefaultDeviceService(id, typeId, this, this, labelSetter: this, gridSizeSetter: this);
+            var server = new Server();
+            server.Services.Add(OpenDeck.Protocol.Device.BindService(srv));
+            server.Ports.Add(new ServerPort(host, port, ServerCredentials.Insecure));
+            server.Start();
+
+            return (server, srv);
         }
 
-        private EventHandler CreateButtonUpHandler(uint x, uint y)
+        private class ButtonWrapper : IDisposable
         {
-            return ButtonUpHandler;
+            private readonly Action<uint, uint> _handleDown;
+            private readonly Action<uint, uint> _handleUp;
+            private readonly Action<uint, uint> _handleClick;
 
-            void ButtonUpHandler(object sender, EventArgs a)
+            public ButtonWrapper(uint x, uint y, Action<uint, uint> handleDown, Action<uint, uint> handleUp, Action<uint, uint> handleClick)
             {
-                ButtonUp?.Invoke(this, new ButtonEventArgs(x, y));
+                X = x;
+                Y = y;
+                _handleDown = handleDown ?? throw new ArgumentNullException(nameof(handleDown));
+                _handleUp = handleUp ?? throw new ArgumentNullException(nameof(handleUp));
+                _handleClick = handleClick ?? throw new ArgumentNullException(nameof(handleClick));
+
+                Button = new Button
+                {
+                    Visible = true,
+                    CanFocus = true,
+                    ReceivesDefault = true,
+                };
+
+                Button.Pressed += HandleDown;
+                Button.Released += HandleUp;
+                Button.Clicked += HandleClick;
             }
-        }
 
-        private EventHandler CreateButtonClickHandler(uint x, uint y)
-        {
-            return ButtonClickedHandler;
+            public uint X { get; }
+            public uint Y { get; }
+            public Button Button { get; }
 
-            void ButtonClickedHandler(object sender, EventArgs a)
+            public void SetLabel(string label) => Button.Label = label;
+            public void SetImage(byte[] image) => throw new NotImplementedException();
+
+            public void Dispose()
             {
-                ButtonClick?.Invoke(this, new ButtonEventArgs(x, y));
+                Button.Pressed -= HandleDown;
+                Button.Released -= HandleUp;
+                Button.Clicked -= HandleClick;
+                Button.Dispose();
             }
+
+            private void HandleDown(object sender, EventArgs e) => _handleDown(X, Y);
+            private void HandleUp(object sender, EventArgs e) => _handleUp(X, Y);
+            private void HandleClick(object sender, EventArgs e) => _handleClick(X, Y);
         }
     }
 }

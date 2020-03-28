@@ -1,14 +1,15 @@
 using System;
 using Grpc.Core;
 using Gtk;
+using OpenDeck.Protocol;
 using UI = Gtk.Builder.ObjectAttribute;
 
 namespace OpenDeck.Device.Gtk
 {
-    public class MainWindow : Window
+    public class MainWindow : Window, IButtonEventSource, IButtonLabelSetter, IGridSizeProvider
     {
         private readonly Button[,] _buttons;
-        private readonly DeviceServiceImpl _srv;
+        private readonly DefaultDeviceService _srv;
         private readonly Server _server;
 
         [UI] private Button _btn00 = null;
@@ -50,21 +51,29 @@ namespace OpenDeck.Device.Gtk
             ForAllButtons((x, y, btn) => btn.Pressed += CreateButtonDownHandler(x, y));
             ForAllButtons((x, y, btn) => btn.Released += CreateButtonUpHandler(x, y));
 
-            _srv = new DeviceServiceImpl(this);
+            _srv = new DefaultDeviceService("tmp-id", "Gtk/0.0.1", this, this, labelSetter: this);
             _server = new Server();
             _server.Services.Add(OpenDeck.Protocol.Device.BindService(_srv));
             _server.Ports.Add(new ServerPort("127.0.0.1", 8020, ServerCredentials.Insecure));
             _server.Start();
         }
 
-        public void ForAllButtons(Action<int, int, Button> op)
+        public event EventHandler<ButtonEventArgs> ButtonDown;
+        public event EventHandler<ButtonEventArgs> ButtonUp;
+        public event EventHandler<ButtonEventArgs> ButtonClick;
+
+        public uint MaxLength => 20;
+
+        public void ForAllButtons(Action<uint, uint, Button> op)
         {
-            for (int y = 0; y < _buttons.GetLength(1); ++y)
-                for (int x = 0; x < _buttons.GetLength(0); ++x)
+            for (uint y = 0; y < _buttons.GetLength(1); ++y)
+                for (uint x = 0; x < _buttons.GetLength(0); ++x)
                     op(x, y, _buttons[x, y]);
         }
 
-        public Button GetButton(int x, int y) => _buttons[x, y];
+        public void SetButtonLabel(uint x, uint y, string label) => _buttons[(int)x, (int)y].Label = label;
+
+        public (uint width, uint height) GetGridSize() => (4, 3);
 
         private void Window_DeleteEvent(object sender, DeleteEventArgs a)
         {
@@ -72,33 +81,33 @@ namespace OpenDeck.Device.Gtk
             Application.Quit();
         }
 
-        private EventHandler CreateButtonDownHandler(int x, int y)
+        private EventHandler CreateButtonDownHandler(uint x, uint y)
         {
-            return ButtonDown;
+            return ButtonDownHandler;
 
-            void ButtonDown(object sender, EventArgs a)
+            void ButtonDownHandler(object sender, EventArgs a)
             {
-                _srv.PushDownEvent(x, y);
+                ButtonDown?.Invoke(this, new ButtonEventArgs(x, y));
             }
         }
 
-        private EventHandler CreateButtonUpHandler(int x, int y)
+        private EventHandler CreateButtonUpHandler(uint x, uint y)
         {
-            return ButtonUp;
+            return ButtonUpHandler;
 
-            void ButtonUp(object sender, EventArgs a)
+            void ButtonUpHandler(object sender, EventArgs a)
             {
-                _srv.PushUpEvent(x, y);
+                ButtonUp?.Invoke(this, new ButtonEventArgs(x, y));
             }
         }
 
-        private EventHandler CreateButtonClickHandler(int x, int y)
+        private EventHandler CreateButtonClickHandler(uint x, uint y)
         {
-            return ButtonClicked;
+            return ButtonClickedHandler;
 
-            void ButtonClicked(object sender, EventArgs a)
+            void ButtonClickedHandler(object sender, EventArgs a)
             {
-                _srv.PushClickEvent(x, y);
+                ButtonClick?.Invoke(this, new ButtonEventArgs(x, y));
             }
         }
     }
